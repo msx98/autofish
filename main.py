@@ -85,6 +85,10 @@ class FishingBot:
                 self.click(VK_S, click_length=20)
                 next_state = State.UNDEFINED
                 break
+            elif msg_type == "infected":
+                self.click(VK_ADRENALINE)
+                next_state = State.UNDEFINED
+                break
             else:
                 # ignore other messages
                 pass

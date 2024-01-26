@@ -35,11 +35,20 @@ def parse_message(line: str) -> Tuple[str, str, Optional[str], Optional[float]]:
             return (None, "already_fishing", None, None)
         except:
             return None
+    def parse_infected() -> Optional[Tuple[None, str, None, None]]:
+        # [HH:MM:SS] A fish has infected you...
+        try:
+            ts = line.split(" ")[0]
+            assert "infected" in line
+            return (ts, "infected", None, None)
+        except:
+            return None
     return (
         parse_fish_type() or
         parse_inv_full() or
         parse_already_fishing() or
         parse_sea_monster() or
+        parse_infected() or
         #parse_finv_fish() or
         None
     )
