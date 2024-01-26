@@ -1,0 +1,6 @@
+pytesseract
+pil
+numpy
+scikit-learn
+scikit-image
+matplotlib
