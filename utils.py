@@ -21,6 +21,10 @@ def printd(s):
     print(f"{DEBUG_COUNTER}, {nice_date}: {s}")
 
 
+def beep(freq=2000, duration=500):
+    win32api.Beep(2000, 500)
+
+
 def calc_dist_from_color(image, color, metric="hsv"):
     if metric == "l2":
         dist = np.sqrt(np.sum((image - color) ** 2, axis=2))

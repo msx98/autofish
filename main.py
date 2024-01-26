@@ -82,10 +82,12 @@ class FishingBot:
                 next_state = State.FISHING
                 break
             elif msg_type == "sea_monster":
+                beep()
                 self.click([VK_SHIFT, VK_S], click_length=20)
                 next_state = State.UNDEFINED
                 break
             elif msg_type == "infected":
+                beep()
                 self.click(VK_ADRENALINE,min_time_between_clicks=10)
                 #next_state = State.UNDEFINED
                 pass #break
@@ -105,6 +107,7 @@ class FishingBot:
             print(f"entry {i}: {result}")
             if result is None:
                 # probably emptied everything?
+                beep()
                 self.click(VK_BACKSPACE)
                 return State.UNDEFINED
             else:
@@ -118,6 +121,7 @@ class FishingBot:
                     # keep fish
                     print(f"keeping {fish_type}")
                     self.click(VK_DOWN)
+        beep()
         self.click(VK_BACKSPACE) # gone over all fish, nothing to throw back
         return State.INVENTORY_FULL_FINAL
     
