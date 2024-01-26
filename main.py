@@ -86,9 +86,9 @@ class FishingBot:
                 next_state = State.UNDEFINED
                 break
             elif msg_type == "infected":
-                self.click(VK_ADRENALINE)
-                next_state = State.UNDEFINED
-                break
+                self.click(VK_ADRENALINE,min_time_between_clicks=10)
+                #next_state = State.UNDEFINED
+                pass #break
             else:
                 # ignore other messages
                 pass
@@ -121,8 +121,7 @@ class FishingBot:
         self.click(VK_BACKSPACE) # gone over all fish, nothing to throw back
         return State.INVENTORY_FULL_FINAL
     
-    def click(self, key, click_length=0.08):
-        min_time_between_clicks = 1
+    def click(self, key, *, click_length:float=0.08, min_time_between_clicks:float=1):
         next_allowed_click = self.last_click + min_time_between_clicks
         time_until_click = next_allowed_click - time.time()
         if time_until_click > 0:

@@ -3,6 +3,7 @@ import colorsys
 VK_TB = 0x74 # = F5
 VK_FISH = 0x75 # = F6
 VK_INV = 0x76 # = F7
+VK_ADRENALINE = 0x78 # = F9
 VK_DOWN = 0x26
 VK_BACKSPACE = 0x08
 VK_ENTER = 0x0D
