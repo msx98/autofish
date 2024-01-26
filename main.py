@@ -74,7 +74,9 @@ class FishingBot:
             ts, msg_type, fish_type, weight = message
             if msg_type == "inv_full":
                 self.click(VK_INV)
-                next_state = State.LOOKING_AT_INVENTORY
+                #next_state = State.LOOKING_AT_INVENTORY
+                next_state = State.INVENTORY_FULL_FINAL
+                beep()
                 break
             elif msg_type == "caught":
                 if should_throwback(fish_type, weight):
