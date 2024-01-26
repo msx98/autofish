@@ -54,7 +54,7 @@ class FishingBot:
             # nothing to do
             pass
         elif prev_state == State.UNDEFINED:
-            # also nothing to do
+            self.click(VK_SHIFT, min_time_between_clicks=7.5) # in case we are dead
             pass
 
     def step_fishing(self):
@@ -82,7 +82,7 @@ class FishingBot:
                 next_state = State.FISHING
                 break
             elif msg_type == "sea_monster":
-                self.click(VK_S, click_length=20)
+                self.click([VK_SHIFT, VK_S], click_length=20)
                 next_state = State.UNDEFINED
                 break
             elif msg_type == "infected":

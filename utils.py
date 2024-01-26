@@ -55,10 +55,14 @@ def select_chat_box(ss):
     return chat_box
 
 
-def click_keyboard(key, click_length=0.08):
-    win32api.keybd_event(key, win32api.MapVirtualKey(key, 0), 0, 0)
+def click_keyboard(keys, click_length=0.08):
+    if isinstance(keys, int):
+        keys = [keys]
+    for key in keys:
+        win32api.keybd_event(key, win32api.MapVirtualKey(key, 0), 0, 0)
     time.sleep(click_length)
-    win32api.keybd_event(key, win32api.MapVirtualKey(key, 0), win32con.KEYEVENTF_KEYUP, 0)
+    for key in keys:
+        win32api.keybd_event(key, win32api.MapVirtualKey(key, 0), win32con.KEYEVENTF_KEYUP, 0)
 
 
 def click_fish():
