@@ -1,5 +1,5 @@
 pytesseract
-pil
+pillow
 numpy
 scikit-learn
 scikit-image
