@@ -87,7 +87,7 @@ class FishingBot:
                 break
             elif msg_type == "caught":
                 with open("fishlog.txt", "a") as f:
-                    f.write(str(message) + "\n")
+                    f.write(str((time.time(), *message)) + "\n")
                 if should_throwback(fish_type, weight):
                     self.click(VK_TB,min_time_between_clicks=5,blocking=False)
                 next_state = State.FISHING
