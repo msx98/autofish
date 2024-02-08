@@ -29,14 +29,6 @@ def should_throwback(fish_type, fish_weight):
     return fish_weight < throwback.get(fish_type, DEFAULT_MIN)
 
 
-class State(Enum):
-    INIT = 0
-    FISHING = 1
-    LOOKING_AT_INVENTORY = 3
-    INVENTORY_FULL_FINAL = 4
-    UNDEFINED = 5
-
-
 class FishingBot:
     def __init__(self):
         self.reset_state()
@@ -141,12 +133,9 @@ class FishingBot:
         return State.INVENTORY_FULL_FINAL
     
     def click(self, key, *, blocking=False, click_length:float=0.08, min_time_between_clicks:float=1):
-        if isinstance(key, int):
-            last_click = self.last_click_button.get(key, 0)
-        elif isinstance(key, (list, tuple,)):
-            last_click = max(self.last_click_button.get(k,0) for k in key)
-        else:
-            raise ValueError(f"Unrecognized arg type for key={key}")
+        if isinstance(key, (list, tuple,)):
+            key = tuple(key)
+        last_click = self.last_click_button.get(key, 0)
         next_allowed_click = last_click + min_time_between_clicks
         time_until_click = next_allowed_click - time.time()
         if time_until_click > 0:

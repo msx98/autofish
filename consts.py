@@ -20,6 +20,38 @@ VK_ENTER = 0x0D
 VK_S = 0x53
 VK_SHIFT = 0x10
 
+
+from enum import Enum
+class State(Enum):
+    INIT = 0
+    FISHING = 1
+    LOOKING_AT_INVENTORY = 3
+    INVENTORY_FULL_FINAL = 4
+    UNDEFINED = 5
+
+
+BEEP_SEQS = {
+    State.INIT: [
+        (500, 1000),
+    ],
+    State.FISHING: [
+        (500, 2000),
+    ],
+    State.INVENTORY_FULL_FINAL: [
+        (300, 1000),
+        (300, 1500),
+        (300, 2000),
+    ],
+    State.UNDEFINED: [
+        (500, 4000),
+        (500, 3000),
+        (500, 4000),
+        (500, 3000),
+        (500, 4000),
+        (500, 3000),
+    ]
+}
+
 COLOR_PURPLE = (116,90,198)#(0.70679, 0.545454, 198)
 COLOR_GREEN = (98,175,98)#(0.333333, 0.43956, 182)
 COLOR_TURQUOISE = (51,204,255) #(0.53897, 0.788235, 255)
