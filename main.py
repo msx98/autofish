@@ -49,7 +49,7 @@ class FishingBot:
     
     def step(self):
         prev_state = self.state
-        self.click(VK_LOTTO, min_time_between_clicks=60*12, blocking=False)
+        self.click(VK_LOTTO, min_time_between_clicks=60*12)
         if prev_state == State.INIT:
             self.click(VK_BACKSPACE)
             self.state = State.FISHING
@@ -61,7 +61,7 @@ class FishingBot:
             # nothing to do
             pass
         elif prev_state == State.UNDEFINED:
-            self.click(VK_SHIFT, min_time_between_clicks=7.5, blocking=False) # in case we are dead
+            self.click(VK_SHIFT, min_time_between_clicks=7.5) # in case we are dead
             pass
 
     def step_fishing(self):
@@ -83,34 +83,34 @@ class FishingBot:
                 #self.click(VK_INV)
                 #next_state = State.LOOKING_AT_INVENTORY
                 next_state = State.INVENTORY_FULL_FINAL
-                self.click(VK_FINFO,min_time_between_clicks=5,blocking=False)
+                self.click(VK_FINFO, min_time_between_clicks=5)
                 beep()
                 break
             elif msg_type == "caught":
                 with open("fishlog.txt", "a") as f:
                     f.write(str((time.time(), *message)) + "\n")
                 if should_throwback(fish_type, weight):
-                    self.click(VK_TB,min_time_between_clicks=5,blocking=False)
+                    self.click(VK_TB, min_time_between_clicks=5)
                 next_state = State.FISHING
-                self.click(VK_FINFO,min_time_between_clicks=5,blocking=False)
+                self.click(VK_FINFO, min_time_between_clicks=5)
                 break
             elif msg_type == "sea_monster":
                 beep()
-                self.click([VK_SHIFT, VK_S], click_length=20)
+                self.click([VK_SHIFT, VK_S], click_length=10)
                 next_state = State.UNDEFINED
                 break
             elif msg_type == "infected":
                 beep()
-                self.click(VK_ADRENALINE,min_time_between_clicks=10,blocking=False)
+                self.click(VK_ADRENALINE, min_time_between_clicks=10)
                 #next_state = State.UNDEFINED
                 pass #break
             else:
                 # ignore other messages
                 pass
         if next_state == State.FISHING:
-            self.click(VK_FISH,min_time_between_clicks=2.5,blocking=False)
-            self.click(VK_SHIFT,min_time_between_clicks=10,blocking=False)
-            self.click(VK_FINFO,min_time_between_clicks=5,blocking=False)
+            self.click(VK_FISH, min_time_between_clicks=2.5)
+            self.click(VK_SHIFT, min_time_between_clicks=10)
+            self.click(VK_FINFO, min_time_between_clicks=5)
         return next_state
 
     def step_inventory(self):
@@ -140,7 +140,7 @@ class FishingBot:
         self.click(VK_BACKSPACE) # gone over all fish, nothing to throw back
         return State.INVENTORY_FULL_FINAL
     
-    def click(self, key, *, blocking=True, click_length:float=0.08, min_time_between_clicks:float=1):
+    def click(self, key, *, blocking=False, click_length:float=0.08, min_time_between_clicks:float=1):
         if isinstance(key, int):
             last_click = self.last_click_button.get(key, 0)
         elif isinstance(key, (list, tuple,)):
