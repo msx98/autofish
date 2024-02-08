@@ -49,6 +49,7 @@ class FishingBot:
     
     def step(self):
         prev_state = self.state
+        self.click(VK_LOTTO, min_time_between_clicks=60*12, blocking=False)
         if prev_state == State.INIT:
             self.click(VK_BACKSPACE)
             self.state = State.FISHING
