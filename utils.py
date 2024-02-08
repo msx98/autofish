@@ -14,6 +14,11 @@ pytesseract.pytesseract.tesseract_cmd = "C:\\Program Files\\Tesseract-OCR\\tesse
 shell = win32com.client.Dispatch("WScript.Shell")
 
 
+def convert_res(x0, y0, x1, y1):
+    return (int(x0*(1280/1920)), int(y0*(720/1080)),
+            int(x1*(1280/1920)), int(y1*(720/1080)))
+
+
 DEBUG_COUNTER = 0
 def printd(s):
     global DEBUG_COUNTER
@@ -21,8 +26,8 @@ def printd(s):
     print(f"{DEBUG_COUNTER}, {nice_date}: {s}")
 
 
-def beep(freq=2000, duration=500):
-    win32api.Beep(2000, 500)
+def beep(*, freq=2000, duration=500):
+    win32api.Beep(freq, duration)
 
 
 def calc_dist_from_color(image, color, metric="hsv"):
@@ -55,7 +60,7 @@ def take_screenshot():
 
 def select_chat_box(ss):
     # select the chat box
-    chat_box = ss.crop((0, 50, 800, 300))
+    chat_box = ss.crop((0, 25, 533, 230))
     return chat_box
 
 

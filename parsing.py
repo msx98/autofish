@@ -6,6 +6,8 @@ def parse_message(line: str) -> Tuple[str, str, Optional[str], Optional[float]]:
         # [HH:MM:SS] You've caught a <number> lb <fish name>. Use /throwback to release the fish
         try:
             time = None# line.split(" ")[0]
+            assert "has" not in line
+            assert "breaking" not in line
             s = line.split("caught a ")[1]
             weight = float(s.split(" ")[0].replace(",",""))
             fish = " ".join(s.split(" ")[2:]).split(".")[0].split(",")[0] # remove weight, lb/Ib from beginning, then get fish name
@@ -43,12 +45,20 @@ def parse_message(line: str) -> Tuple[str, str, Optional[str], Optional[float]]:
             return (ts, "infected", None, None)
         except:
             return None
+    def parse_exploded() -> Optional[Tuple[None, str, None, None]]:
+        try:
+            ts = line.split(" ")[0]
+            assert "exploded" in line
+            return (ts, "exploded", None, None)
+        except:
+            return None
     return (
         parse_fish_type() or
         parse_inv_full() or
         parse_already_fishing() or
         parse_sea_monster() or
         parse_infected() or
+        #parse_exploded() or
         #parse_finv_fish() or
         None
     )
@@ -64,7 +74,7 @@ def parse_finv_fish(line) -> Optional[Tuple[None, str, None, None]]:
 
 
 def extract_finv_fish(image) -> Tuple[Optional[str], str, Optional[str], Optional[float]]:
-    finv_info = np.array(image.crop((1500,760,1920,900)))
+    finv_info = np.array(image.crop(convert_res(1500,760,1920,900)))
     dist_from_purple = calc_dist_from_color(finv_info, COLOR_PURPLE)
     dist_from_green = calc_dist_from_color(finv_info, COLOR_GREEN)
     dist_from_black = calc_dist_from_color(finv_info, [0,0,0], "l2")
@@ -82,7 +92,7 @@ def extract_chat_messages(image) -> List[Tuple[Optional[str], str, Optional[str]
         parsed = [parse_message(x) for x in lines]
         valid = [x for x in parsed if x]
         return set(valid)
-    chat_box = np.array(image.crop((0, 50, 800, 300)))
+    chat_box = np.array(image.crop((0, 25, 533, 230)))
     dist_from_blue = calc_dist_from_color(chat_box, COLOR_TURQUOISE)
     dist_from_black = calc_dist_from_color(chat_box, [0,0,0], "l2")
     red_mask = (chat_box[:,:,1] < 50) & (chat_box[:,:,2] < 50) & (chat_box[:,:,0] > 100) | (dist_from_black < 2)

@@ -4,3 +4,4 @@ numpy
 scikit-learn
 scikit-image
 matplotlib
+pywin32
