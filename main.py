@@ -5,21 +5,26 @@ shell.AppActivate("FiveM")
 
 def should_throwback(fish_type, fish_weight):
     DONT_WANT = 999999999
-    DEFAULT_MIN = 100
+    DEFAULT_MIN = 150
+    fish_type = fish_type.lower()
     throwback = {
         # throw back any fish weighing less than this
         # if unspecified, keep
         "sunfish": DONT_WANT,
         "catfish": DONT_WANT,
-        "sturgeon": 2000,
-        "swordfish": 1000,
-        "sailfish": 500,
-        "moray eel": 150,
-        "shark": 1750,
-        "amberjack": 200,
-        "tuna": 2000,
-        "mackerel": 200,
+        "swordfish": DONT_WANT,
+        "tuna": DONT_WANT,
+        "mackerel": DONT_WANT,
+        "sturgeon": DONT_WANT, # maybe 2000?
+        "cod": DONT_WANT,
+        "halibut": 100,
+        "shark": 2000, # maybe dont want?
+        "squid": 1000,
+        "sailfish": 1000,
+        "amberjack": 1000,
         "blue marlin": 2000,
+        "moray eel": 100,
+        "ray": 100,
     }
     return fish_weight < throwback.get(fish_type, DEFAULT_MIN)
 
@@ -39,6 +44,7 @@ class FishingBot:
     
     def reset_state(self):
         self.last_click = time.time()
+        self.last_click_button = dict()
         self.state = State.INIT
     
     def step(self):
@@ -54,7 +60,7 @@ class FishingBot:
             # nothing to do
             pass
         elif prev_state == State.UNDEFINED:
-            self.click(VK_SHIFT, min_time_between_clicks=7.5) # in case we are dead
+            self.click(VK_SHIFT, min_time_between_clicks=7.5, blocking=False) # in case we are dead
             pass
 
     def step_fishing(self):
@@ -73,15 +79,19 @@ class FishingBot:
         for message in messages_to_react_to:
             ts, msg_type, fish_type, weight = message
             if msg_type == "inv_full":
-                self.click(VK_INV)
+                #self.click(VK_INV)
                 #next_state = State.LOOKING_AT_INVENTORY
                 next_state = State.INVENTORY_FULL_FINAL
+                self.click(VK_FINFO,min_time_between_clicks=5,blocking=False)
                 beep()
                 break
             elif msg_type == "caught":
+                with open("fishlog.txt", "a") as f:
+                    f.write(str(message) + "\n")
                 if should_throwback(fish_type, weight):
-                    self.click(VK_TB)
+                    self.click(VK_TB,min_time_between_clicks=5,blocking=False)
                 next_state = State.FISHING
+                self.click(VK_FINFO,min_time_between_clicks=5,blocking=False)
                 break
             elif msg_type == "sea_monster":
                 beep()
@@ -90,14 +100,16 @@ class FishingBot:
                 break
             elif msg_type == "infected":
                 beep()
-                self.click(VK_ADRENALINE,min_time_between_clicks=10)
+                self.click(VK_ADRENALINE,min_time_between_clicks=10,blocking=False)
                 #next_state = State.UNDEFINED
                 pass #break
             else:
                 # ignore other messages
                 pass
         if next_state == State.FISHING:
-            self.click(VK_FISH)
+            self.click(VK_FISH,min_time_between_clicks=2.5,blocking=False)
+            self.click(VK_SHIFT,min_time_between_clicks=10,blocking=False)
+            self.click(VK_FINFO,min_time_between_clicks=5,blocking=False)
         return next_state
 
     def step_inventory(self):
@@ -127,29 +139,48 @@ class FishingBot:
         self.click(VK_BACKSPACE) # gone over all fish, nothing to throw back
         return State.INVENTORY_FULL_FINAL
     
-    def click(self, key, *, click_length:float=0.08, min_time_between_clicks:float=1):
-        next_allowed_click = self.last_click + min_time_between_clicks
+    def click(self, key, *, blocking=True, click_length:float=0.08, min_time_between_clicks:float=1):
+        if isinstance(key, int):
+            last_click = self.last_click_button.get(key, 0)
+        elif isinstance(key, (list, tuple,)):
+            last_click = max(self.last_click_button.get(k,0) for k in key)
+        else:
+            raise ValueError(f"Unrecognized arg type for key={key}")
+        next_allowed_click = last_click + min_time_between_clicks
         time_until_click = next_allowed_click - time.time()
         if time_until_click > 0:
-            time.sleep(time_until_click)
+            if blocking:
+                time.sleep(time_until_click)
+            else:
+                return
         click_keyboard(key, click_length)
-        self.last_click = time.time()
+        click_time = time.time()
+        self.last_click = click_time
+        self.last_click_button[key] = click_time
 
 
 def main():
     #time.sleep(5)
     global DEBUG_COUNTER
     bot = FishingBot()
+    is_enabled_next = None
     is_enabled = False
     while True:
-        is_enabled = is_enabled ^ win32api.GetAsyncKeyState(win32con.VK_CAPITAL)
+        is_enabled_next = is_enabled ^ win32api.GetAsyncKeyState(win32con.VK_DELETE)
+        if is_enabled_next != is_enabled:
+            if is_enabled_next:
+                printd(f"enabled. running, state is {bot.state}")
+                beep(freq=3500)
+            else:
+                printd("disabled. waiting")
+                beep(freq=2000)
+        is_enabled = is_enabled_next
         if is_enabled:
             printd(f"enabled. running, state is {bot.state}")
             bot.step()
         else:
-            printd("disabled. waiting")
             bot.reset_state()
-        time.sleep(1)
+        time.sleep(0.1)
         DEBUG_COUNTER += 1
 
 
