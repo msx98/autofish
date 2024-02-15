@@ -22,13 +22,15 @@ VK_S = 0x53
 VK_SHIFT = 0x10
 
 
-from enum import Enum
+from enum import Enum, auto
 class State(Enum):
-    INIT = 0
-    FISHING = 1
-    LOOKING_AT_INVENTORY = 3
-    INVENTORY_FULL_FINAL = 4
-    UNDEFINED = 5
+    DISABLED = auto()
+    INIT = auto()
+    WAIT_FOR_FISHING = auto()
+    FISHING = auto()
+    DEAD = auto()
+    INVENTORY_FULL_FINAL = auto()
+    UNDEFINED = auto()
 
 
 BEEP_SEQS = {
@@ -58,3 +60,23 @@ COLOR_GREEN = (98,175,98)#(0.333333, 0.43956, 182)
 COLOR_TURQUOISE = (51,204,255) #(0.53897, 0.788235, 255)
 COLOR_RED = (255,0,0) # colorsys.rgb_to_hex(190,12,14)
 COLOR_RED_2 = (189,9,10)
+
+from dataclasses import dataclass
+
+@dataclass
+class Event:
+    ts: str
+    name: str
+    fish_type: str
+    fish_weight: float
+    def __init__(self, ts, name, fish_type=None, fish_weight=None):
+        self.ts = ts
+        self.name = name
+        self.fish_type = fish_type
+        self.fish_weight = fish_weight
+    def __str__(self) -> str:
+        return str((self.ts, self.name, self.fish_type, self.fish_weight))
+    def __repr__(self) -> str:
+        return self.__str__()
+    def __hash__(self):
+        return hash(str(self))

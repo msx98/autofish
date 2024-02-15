@@ -55,7 +55,7 @@ def calc_l2_dist_from_color(image, color):
     return dist
 
 
-def take_screenshot():
+def take_screenshot() -> Image.Image:
     return ImageGrab.grab()
 
 

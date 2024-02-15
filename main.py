@@ -29,89 +29,170 @@ def should_throwback(fish_type, fish_weight):
     return fish_weight < throwback.get(fish_type, DEFAULT_MIN)
 
 
+import threading
 class FishingBot:
     def __init__(self):
-        self.reset_state()
-        self.messages = []
+        self.state = State.DISABLED
+        self.events: List[Event] = []
+        self.events_lock: threading.Lock = threading.Lock()
+        self.new_mask_lock: threading.Lock = threading.Lock()
+        self.new_mask = False
+        self.unread_events: int = 0
+        self.extract_chat_events_loop()
     
-    def reset_state(self):
-        self.last_click = time.time()
-        self.last_click_button = dict()
-        self.state = State.INIT
-    
-    def step(self):
-        prev_state = self.state
-        self.click(VK_LOTTO, min_time_between_clicks=60*12)
-        if prev_state == State.INIT:
-            self.click(VK_BACKSPACE)
-            self.state = State.FISHING
-        if prev_state == State.FISHING:
-            self.state = self.step_fishing()
-        elif prev_state == State.INVENTORY_FULL_FINAL:
-            # nothing to do
-            pass
-        elif prev_state == State.UNDEFINED:
-            self.click(VK_SHIFT, min_time_between_clicks=7.5) # in case we are dead
-            pass
+    @property
+    def state(self):
+        return self._state
 
-    def step_fishing(self):
-        assert self.state == State.FISHING
-        ss = take_screenshot()
-        messages = extract_chat_messages(ss)
-        messages_to_react_to = []
-        next_state = State.FISHING
-        for message in messages:
-            if message in self.messages:
-                continue
-            messages_to_react_to.append(message)
-        self.messages += messages_to_react_to
-        self.messages = self.messages[-100:]
-        printd(f"messages to react to: {messages_to_react_to}")
-        for message in messages_to_react_to:
-            ts, msg_type, fish_type, weight = message
-            if msg_type == "inv_full":
-                next_state = State.INVENTORY_FULL_FINAL
-                self.click(VK_FINFO, min_time_between_clicks=5)
-                beep()
-                break
-            elif msg_type == "caught":
-                with open("fishlog.txt", "a") as f:
-                    f.write(str((time.time(), *message)) + "\n")
-                if should_throwback(fish_type, weight):
-                    self.click(VK_TB, min_time_between_clicks=5)
-                next_state = State.FISHING
-                self.click(VK_FINFO, min_time_between_clicks=5)
-                break
-            elif msg_type == "sea_monster":
-                beep()
-                self.click([VK_SHIFT, VK_S], click_length=10)
-                next_state = State.UNDEFINED
-                break
-            elif msg_type == "infected":
-                beep()
-                self.click(VK_ADRENALINE, min_time_between_clicks=10)
-                #next_state = State.UNDEFINED
-                pass #break
-            else:
-                # ignore other messages
-                pass
-        if next_state == State.FISHING:
+    @property
+    def enabled(self):
+        return self.state != State.DISABLED
+    
+    @state.setter
+    def state(self, new_state: State):
+        old_state = getattr(self, "_state", None)
+        if new_state == old_state:
+            return
+        printd(f"old_state={old_state} --> new_state={new_state}")
+        self._state = new_state
+        if new_state in {State.INIT, State.DISABLED}:
+            self.last_click = time.time()
+            self.last_click_button = dict()
+    
+    @enabled.setter
+    def enabled(self, value: bool):
+        self.state = State.INIT if value else State.DISABLED
+    
+    def toggle(self):
+        self.enabled = not self.enabled
+        printd(f"Bot toggled: enabled={self.enabled}")
+
+    def step(self):
+        self.state = self.perform_step(self.state)
+        self.perform_post_step(self.state)
+    
+    def extract_chat_events_loop(self):
+        self.ss = None
+        def ss_thread():
+            self.ss = np.array(take_screenshot().crop((17,100,495,210)))
+            self.mask = extract_mask(None, self.ss)
+            while True:
+                if self.enabled:
+                    #self.ss = np.array(take_screenshot().crop((17,145,495,210)))
+                    new_ss = np.array(take_screenshot().crop((17,100,495,210)))
+                    new_mask = extract_mask(None, new_ss)
+                    diff = np.mean(self.mask - new_mask)
+                    self.new_mask_lock.acquire()
+                    self.ss = new_ss
+                    self.mask = new_mask
+                    if diff > 0.1:
+                        self.new_mask = True
+                    self.new_mask_lock.release()
+                    time.sleep(0.1)
+        def loop(which):
+            while True:
+                if self.enabled:
+                    t = time.time()
+                    self.new_mask_lock.acquire()
+                    new_mask = self.new_mask
+                    if new_mask:
+                        new_mask = False
+                        chat_events = extract_chat_events(which, self.ss, self.mask)
+                        self.new_mask_lock.release()
+                    else:
+                        self.new_mask_lock.release()
+                        continue
+                    delay = time.time() - t
+                    self.events_lock.acquire()
+                    new_events: List[Event] = [e for e in chat_events if e not in self.events]
+                    printd(f"{which} extracting {len(chat_events)} chat events of which {len(new_events)} are new, took {round(delay,2)}: {new_events}")
+                    self.unread_events += len(new_events)
+                    self.events = (self.events + new_events)[-100:]
+                    self.events_lock.release()
+        threading.Thread(target=ss_thread).start()
+        time.sleep(0.25)
+        #threading.Thread(target=loop, args=("red",)).start()
+        #threading.Thread(target=loop, args=("blue",)).start()
+        threading.Thread(target=loop, args=(None,)).start()
+
+
+    def perform_step(self, state: State) -> State:
+        if state == State.DISABLED:
+            return state
+        elif state == State.INIT:
+            return State.FISHING
+        elif state == State.FISHING:
+            self.events_lock.acquire()
+            new_events = self.events[len(self.events)-self.unread_events:]
+            self.unread_events = 0
+            self.events_lock.release()
+            for e in new_events:
+                state = self.step_on_event(state, e)
+            return state
+        raise RuntimeError(f"Undefined state: {state}")
+
+    def perform_post_step(self, state: State):
+        if state == State.INIT:
+            self.click(VK_BACKSPACE)
+        elif state == State.FISHING:
             self.click(VK_FISH, min_time_between_clicks=2.5)
             self.click(VK_SHIFT, min_time_between_clicks=10)
             self.click(VK_FINFO, min_time_between_clicks=5)
-        return next_state
-    
-    def click(self, key, *, blocking=False, click_length:float=0.08, min_time_between_clicks:float=1):
+        elif state == State.UNDEFINED:
+            self.click(VK_SHIFT, min_time_between_clicks=7.5) # in case we are dead
+        self.click(VK_LOTTO, min_time_between_clicks=60*12)
+
+    def step_on_event(self, prev_state: State, e: Event) -> State:
+        printd(f"REACT: {e}")
+        if e.name == "fishing":
+            return State.FISHING
+        elif prev_state == State.FISHING:
+            if e.name == "caught":
+                with open("fishlog.txt", "a") as f:
+                    f.write(str((time.time(), None, e.name, e.fish_type, e.fish_weight)) + "\n")
+                if should_throwback(e.fish_type, e.fish_weight):
+                    self.click(VK_TB, min_time_between_clicks=5)
+                self.click(VK_FINFO, min_time_between_clicks=5)
+                return prev_state
+            elif e.name == "inv_full":
+                self.click(VK_FINFO, min_time_between_clicks=5)
+                beep()
+                return State.DISABLED
+            elif e.name == "sea_monster":
+                beep()
+                self.click(VK_SHIFT)
+                time.sleep(0.3)
+                self.click([VK_SHIFT, VK_S], click_length=7, min_time_between_clicks=0.1)
+                return State.DISABLED
+            elif e.name == "exploded":
+                beep()
+                self.click(VK_SHIFT, min_time_between_clicks=0.1)
+                return State.DISABLED
+            elif e.name == "quit":
+                return State.DISABLED
+            elif e.name == "infected":
+                beep()
+                self.click(VK_ADRENALINE, min_time_between_clicks=10)
+                time.sleep(1)
+                self.click(VK_FISH, min_time_between_clicks=None)
+                time.sleep(1)
+                return prev_state
+            else:
+                return prev_state
+        raise RuntimeError(f"Did not return a state: {e}, {prev_state}")
+
+    def click(self, key, *, block_until_keydown=False, click_length:float=0.08, min_time_between_clicks:Optional[float]=1):
         if isinstance(key, (list, tuple,)):
             key = tuple(key)
         last_click = self.last_click_button.get(key, 0)
-        next_allowed_click = last_click + min_time_between_clicks
-        time_until_click = next_allowed_click - time.time()
-        if time_until_click > 0:
-            if blocking:
-                time.sleep(time_until_click)
-            else:
-                return
+        if min_time_between_clicks is not None:
+            next_allowed_click = last_click + min_time_between_clicks
+            time_until_click = next_allowed_click - time.time()
+            if time_until_click > 0:
+                if block_until_keydown:
+                    time.sleep(time_until_click)
+                else:
+                    return
         click_keyboard(key, click_length)
         click_time = time.time()
         self.last_click = click_time
@@ -122,24 +203,15 @@ def main():
     #time.sleep(5)
     global DEBUG_COUNTER
     bot = FishingBot()
-    is_enabled_next = None
-    is_enabled = False
     while True:
-        is_enabled_next = is_enabled ^ win32api.GetAsyncKeyState(win32con.VK_DELETE)
-        if is_enabled_next != is_enabled:
-            if is_enabled_next:
-                printd(f"enabled. running, state is {bot.state}")
-                beep(freq=3500)
-            else:
-                printd("disabled. waiting")
-                beep(freq=2000)
-        is_enabled = is_enabled_next
-        if is_enabled:
-            printd(f"enabled. running, state is {bot.state}")
-            bot.step()
+        if win32api.GetAsyncKeyState(win32con.VK_DELETE):
+            bot.toggle()
+        bot.step()
+        if bot.enabled:
+            time.sleep(0.08)
+            pass
         else:
-            bot.reset_state()
-        time.sleep(0.1)
+            time.sleep(1/30)
         DEBUG_COUNTER += 1
 
 
