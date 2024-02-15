@@ -10,6 +10,7 @@ import pytesseract
 import numpy as np
 import colorsys
 from matplotlib.colors import rgb_to_hsv
+from threading import Thread
 pytesseract.pytesseract.tesseract_cmd = "C:\\Program Files\\Tesseract-OCR\\tesseract.exe"
 shell = win32com.client.Dispatch("WScript.Shell")
 
@@ -64,14 +65,19 @@ def select_chat_box(ss):
     return chat_box
 
 
-def click_keyboard(keys, click_length=0.08):
+def click_keyboard(keys, click_length=0.08, *, new_thread: bool = True):
     if isinstance(keys, int):
         keys = [keys]
-    for key in keys:
-        win32api.keybd_event(key, win32api.MapVirtualKey(key, 0), 0, 0)
-    time.sleep(click_length)
-    for key in keys:
-        win32api.keybd_event(key, win32api.MapVirtualKey(key, 0), win32con.KEYEVENTF_KEYUP, 0)
+    def do_click():
+        for key in keys:
+            win32api.keybd_event(key, win32api.MapVirtualKey(key, 0), 0, 0)
+        time.sleep(click_length)
+        for key in keys:
+            win32api.keybd_event(key, win32api.MapVirtualKey(key, 0), win32con.KEYEVENTF_KEYUP, 0)
+    if new_thread:
+        Thread(target=do_click).start()
+    else:
+        do_click()
 
 
 def click_fish():
