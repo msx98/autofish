@@ -47,8 +47,6 @@ class FishingBot:
             self.state = State.FISHING
         if prev_state == State.FISHING:
             self.state = self.step_fishing()
-        elif prev_state == State.LOOKING_AT_INVENTORY:
-            self.state = self.step_inventory()
         elif prev_state == State.INVENTORY_FULL_FINAL:
             # nothing to do
             pass
@@ -72,8 +70,6 @@ class FishingBot:
         for message in messages_to_react_to:
             ts, msg_type, fish_type, weight = message
             if msg_type == "inv_full":
-                #self.click(VK_INV)
-                #next_state = State.LOOKING_AT_INVENTORY
                 next_state = State.INVENTORY_FULL_FINAL
                 self.click(VK_FINFO, min_time_between_clicks=5)
                 beep()
@@ -104,33 +100,6 @@ class FishingBot:
             self.click(VK_SHIFT, min_time_between_clicks=10)
             self.click(VK_FINFO, min_time_between_clicks=5)
         return next_state
-
-    def step_inventory(self):
-        assert self.state == State.LOOKING_AT_INVENTORY
-        print("iterating over fish")
-        for i in range(20): # there are max 20 fish
-            ss = take_screenshot()
-            result = extract_finv_fish(ss)
-            print(f"entry {i}: {result}")
-            if result is None:
-                # probably emptied everything?
-                beep()
-                self.click(VK_BACKSPACE)
-                return State.UNDEFINED
-            else:
-                _, _, fish_type, weight = result
-                if should_throwback(fish_type, weight):
-                    print(f"throwing back {fish_type} weighing {weight}")
-                    self.click(VK_ENTER)
-                    self.click(VK_BACKSPACE)
-                    return State.FISHING
-                else:
-                    # keep fish
-                    print(f"keeping {fish_type}")
-                    self.click(VK_DOWN)
-        beep()
-        self.click(VK_BACKSPACE) # gone over all fish, nothing to throw back
-        return State.INVENTORY_FULL_FINAL
     
     def click(self, key, *, blocking=False, click_length:float=0.08, min_time_between_clicks:float=1):
         if isinstance(key, (list, tuple,)):
