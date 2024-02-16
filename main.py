@@ -38,6 +38,7 @@ class FishingBot:
         self.new_mask_lock: threading.Lock = threading.Lock()
         self.new_mask = False
         self.unread_events: int = 0
+        self.tried_to_throw = None
         self.extract_chat_events_loop()
     
     @property
@@ -66,6 +67,7 @@ class FishingBot:
     @enabled.setter
     def enabled(self, value: bool):
         self.state = State.INIT if value else State.DISABLED
+        self.tried_to_throw = None
     
     def toggle(self):
         enabled = not self.enabled
@@ -155,6 +157,7 @@ class FishingBot:
             self.click([VK_SHIFT, VK_S], click_length=7, min_time_between_clicks=0.1)
             return State.DISABLED
         if e.name == "exploded":
+            time.sleep(1)
             self.click(VK_SHIFT, min_time_between_clicks=0.1)
             return State.DISABLED
         if e.name == "quit":
@@ -168,6 +171,7 @@ class FishingBot:
         if e.name == "already_fishing":
             return State.FISHING
         if e.name == "thrown":
+            self.tried_to_throw = None
             return State.FISHING
         raise RuntimeError(f"Did not return a state: {e}, {prev_state}")
 

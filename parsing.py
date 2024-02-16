@@ -29,7 +29,7 @@ def parse_message(line: str) -> Optional[Event]:
     def parse_fishing() -> Optional[Event]:
         # [HH:MM:SS] Fishing... Please Wait.
         try:
-            time = None# line.split(" ")[0]
+            time = line.split(" ")[0]
             assert ("fishing..." in line) or ("please wait" in line)
             return Event(time, "fishing")
         except:
@@ -68,7 +68,7 @@ def parse_message(line: str) -> Optional[Event]:
     def parse_exploded() -> Optional[Event]:
         try:
             ts = line.split(" ")[0]
-            assert "exploded" in line
+            assert ("undetonated" in line) or ("you're dead" in line)
             return Event(ts, "exploded")
         except:
             return None
@@ -88,7 +88,7 @@ def parse_message(line: str) -> Optional[Event]:
         parse_infected() or
         parse_fishing() or
         parse_quit_fishing() or
-        #parse_exploded() or
+        parse_exploded() or
         #parse_finv_fish() or
         None
     )
