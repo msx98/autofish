@@ -20,7 +20,7 @@ def should_throwback(fish_type, fish_weight):
         "halibut": 100,
         "shark": 2000, # maybe dont want?
         "squid": 1000,
-        "sailfish": 1000,
+        "sailfish": 1000, "saitfish": 1000,
         "amberjack": 1000,
         "blue marlin": 2000,
         "moray eel": 100,
@@ -58,14 +58,18 @@ class FishingBot:
         if new_state in {State.INIT, State.DISABLED}:
             self.last_click = time.time()
             self.last_click_button = dict()
+            if new_state == State.INIT: #enabled
+                beep(freq=3500, duration=500)
+            else: #disabled
+                beep(freq=1500, duration=500)
     
     @enabled.setter
     def enabled(self, value: bool):
         self.state = State.INIT if value else State.DISABLED
     
     def toggle(self):
-        self.enabled = not self.enabled
-        printd(f"Bot toggled: enabled={self.enabled}")
+        enabled = not self.enabled
+        self.enabled = enabled
 
     def step(self):
         self.state = self.perform_step(self.state)
@@ -74,12 +78,11 @@ class FishingBot:
     def extract_chat_events_loop(self):
         self.ss = None
         def ss_thread():
-            self.ss = np.array(take_screenshot().crop((17,100,495,210)))
+            self.ss = np.array(select_chat_box(take_screenshot()))
             self.mask = extract_mask(None, self.ss)
             while True:
                 if self.enabled:
-                    #self.ss = np.array(take_screenshot().crop((17,145,495,210)))
-                    new_ss = np.array(take_screenshot().crop((17,100,495,210)))
+                    new_ss = np.array(select_chat_box(take_screenshot()))
                     new_mask = extract_mask(None, new_ss)
                     diff = np.mean(self.mask - new_mask)
                     self.new_mask_lock.acquire()
@@ -105,7 +108,7 @@ class FishingBot:
                     delay = time.time() - t
                     self.events_lock.acquire()
                     new_events: List[Event] = [e for e in chat_events if e not in self.events]
-                    printd(f"{which} extracting {len(chat_events)} chat events of which {len(new_events)} are new, took {round(delay,2)}: {new_events}")
+                    #printd(f"{which} extracting {len(chat_events)} chat events of which {len(new_events)} are new, took {round(delay,2)}: {new_events}")
                     self.unread_events += len(new_events)
                     self.events = (self.events + new_events)[-100:]
                     self.events_lock.release()
@@ -114,7 +117,6 @@ class FishingBot:
         #threading.Thread(target=loop, args=("red",)).start()
         #threading.Thread(target=loop, args=("blue",)).start()
         threading.Thread(target=loop, args=(None,)).start()
-
 
     def perform_step(self, state: State) -> State:
         if state == State.DISABLED:
@@ -131,6 +133,44 @@ class FishingBot:
             return state
         raise RuntimeError(f"Undefined state: {state}")
 
+    def step_on_event(self, prev_state: State, e: Event) -> State:
+        printd(f"REACT: {e}")
+        if e.name == "fishing":
+            return State.FISHING
+        if e.name == "caught":
+            with open("fishlog.txt", "a") as f:
+                f.write(str((time.time(), None, e.name, e.fish_type, e.fish_weight)) + "\n")
+            if should_throwback(e.fish_type, e.fish_weight):
+                time.sleep(0.75)
+                result = self.click(VK_TB, min_time_between_clicks=5)
+                printd(f"Throwback result for {e.fish_type}: {result}")
+            self.click(VK_FINFO, min_time_between_clicks=5)
+            return State.FISHING#prev_state
+        if e.name == "inv_full":
+            self.click(VK_FINFO, min_time_between_clicks=5)
+            return State.DISABLED
+        if e.name == "sea_monster":
+            self.click(VK_SHIFT)
+            time.sleep(0.3)
+            self.click([VK_SHIFT, VK_S], click_length=7, min_time_between_clicks=0.1)
+            return State.DISABLED
+        if e.name == "exploded":
+            self.click(VK_SHIFT, min_time_between_clicks=0.1)
+            return State.DISABLED
+        if e.name == "quit":
+            return State.DISABLED
+        if e.name == "infected":
+            self.click(VK_ADRENALINE, min_time_between_clicks=10)
+            time.sleep(5)
+            self.click(VK_FISH, min_time_between_clicks=None)
+            time.sleep(1)
+            return State.FISHING#prev_state
+        if e.name == "already_fishing":
+            return State.FISHING
+        if e.name == "thrown":
+            return State.FISHING
+        raise RuntimeError(f"Did not return a state: {e}, {prev_state}")
+
     def perform_post_step(self, state: State):
         if state == State.INIT:
             self.click(VK_BACKSPACE)
@@ -142,46 +182,7 @@ class FishingBot:
             self.click(VK_SHIFT, min_time_between_clicks=7.5) # in case we are dead
         self.click(VK_LOTTO, min_time_between_clicks=60*12)
 
-    def step_on_event(self, prev_state: State, e: Event) -> State:
-        printd(f"REACT: {e}")
-        if e.name == "fishing":
-            return State.FISHING
-        elif prev_state == State.FISHING:
-            if e.name == "caught":
-                with open("fishlog.txt", "a") as f:
-                    f.write(str((time.time(), None, e.name, e.fish_type, e.fish_weight)) + "\n")
-                if should_throwback(e.fish_type, e.fish_weight):
-                    self.click(VK_TB, min_time_between_clicks=5)
-                self.click(VK_FINFO, min_time_between_clicks=5)
-                return prev_state
-            elif e.name == "inv_full":
-                self.click(VK_FINFO, min_time_between_clicks=5)
-                beep()
-                return State.DISABLED
-            elif e.name == "sea_monster":
-                beep()
-                self.click(VK_SHIFT)
-                time.sleep(0.3)
-                self.click([VK_SHIFT, VK_S], click_length=7, min_time_between_clicks=0.1)
-                return State.DISABLED
-            elif e.name == "exploded":
-                beep()
-                self.click(VK_SHIFT, min_time_between_clicks=0.1)
-                return State.DISABLED
-            elif e.name == "quit":
-                return State.DISABLED
-            elif e.name == "infected":
-                beep()
-                self.click(VK_ADRENALINE, min_time_between_clicks=10)
-                time.sleep(1)
-                self.click(VK_FISH, min_time_between_clicks=None)
-                time.sleep(1)
-                return prev_state
-            else:
-                return prev_state
-        raise RuntimeError(f"Did not return a state: {e}, {prev_state}")
-
-    def click(self, key, *, block_until_keydown=False, click_length:float=0.08, min_time_between_clicks:Optional[float]=1):
+    def click(self, key, *, block_until_keydown=False, click_length:float=0.08, min_time_between_clicks:Optional[float]=1) -> Optional[bool]:
         if isinstance(key, (list, tuple,)):
             key = tuple(key)
         last_click = self.last_click_button.get(key, 0)
@@ -192,11 +193,12 @@ class FishingBot:
                 if block_until_keydown:
                     time.sleep(time_until_click)
                 else:
-                    return
+                    return False
         click_keyboard(key, click_length)
         click_time = time.time()
         self.last_click = click_time
         self.last_click_button[key] = click_time
+        return True
 
 
 def main():

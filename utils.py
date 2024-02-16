@@ -61,7 +61,8 @@ def take_screenshot() -> Image.Image:
 
 def select_chat_box(ss):
     # select the chat box
-    chat_box = ss.crop((0, 25, 533, 230))
+    #chat_box = ss.crop((17,100,495,210))
+    chat_box = ss.crop((17,45,495,210))
     return chat_box
 
 

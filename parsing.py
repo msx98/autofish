@@ -150,7 +150,7 @@ def extract_chat_events(which=None, image: Optional[Union[Image.Image,np.ndarray
     if type(image) == np.ndarray:
         chat_box = image
     else:
-        chat_box = np.array(image.crop((17,145,495,210)))
+        chat_box = np.array(select_chat_box(image))
     if mask is None:
         mask = extract_mask(which, image)
     chat_box = np.where(mask, np.array(chat_box), 0)
