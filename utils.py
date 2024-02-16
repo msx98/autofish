@@ -35,9 +35,12 @@ def calc_dist_from_color(image, color, metric="hsv"):
     if metric == "l2":
         dist = np.sqrt(np.sum((image - color) ** 2, axis=2))
     elif metric == "hsv":
-        image_hsv = rgb_to_hsv(image)[:,:,0:2]
+        image_hsv = image[:,:,0:2]
         color_hsv = colorsys.rgb_to_hsv(*color)[0:2]
         dist = np.sqrt(np.sum((image_hsv - color_hsv) ** 2, axis=2))
+    elif metric == "intensity":
+        image_hsv = image[:,:,2]
+        dist = image_hsv - color
     return dist
 
 

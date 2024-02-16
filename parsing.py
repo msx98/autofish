@@ -111,31 +111,16 @@ def extract_finv_fish(image) -> Tuple[Event]:
     except:
         return None
 
-def extract_mask(which=None, image: Optional[Union[Image.Image,np.ndarray]] = None) -> np.ndarray:
-    if image is None:
-        image = take_screenshot()
-    if type(image) == np.ndarray:
-        chat_box = image
-    else:
-        chat_box = np.array(image.crop((17,145,495,210)))
-    dist_from_black = calc_dist_from_color(chat_box, [0,0,0], "l2")
-    final_mask = None
-    if which == "red":
-        red_mask = (chat_box[:,:,1] < 50) & (chat_box[:,:,2] < 50) & (chat_box[:,:,0] > 100) | (dist_from_black < 2)
-        red_mask = np.stack([red_mask, red_mask, red_mask], axis=2)
-        final_mask = red_mask
-    elif which == "blue":
-        dist_from_blue = calc_dist_from_color(chat_box, COLOR_TURQUOISE)
-        blue_mask = np.uint8(((dist_from_blue <= 0.03) | (dist_from_black < 2)) * 255)
-        blue_mask = np.stack([blue_mask, blue_mask, blue_mask], axis=2)
-        final_mask = blue_mask
-    else:
-        red_mask = (chat_box[:,:,1] < 50) & (chat_box[:,:,2] < 50) & (chat_box[:,:,0] > 100) | (dist_from_black < 2)
-        red_mask = np.stack([red_mask, red_mask, red_mask], axis=2)
-        dist_from_blue = calc_dist_from_color(chat_box, COLOR_TURQUOISE)
-        blue_mask = np.uint8(((dist_from_blue <= 0.03) | (dist_from_black < 2)) * 255)
-        blue_mask = np.stack([blue_mask, blue_mask, blue_mask], axis=2)
-        final_mask = blue_mask | red_mask
+def extract_mask(which=None, image: Optional[np.ndarray] = None) -> np.ndarray:
+    chat_box = np.array(image)
+    chat_box_hsv = rgb_to_hsv(chat_box)
+    dist_from_black = calc_dist_from_color(chat_box_hsv, 0, "intensity")
+    dist_from_blue = calc_dist_from_color(chat_box_hsv, COLOR_TURQUOISE)
+    shadow_mask = dist_from_black<np.min(dist_from_black)+20
+    red_mask = ((chat_box[:,:,1] < 50) & (chat_box[:,:,2] < 50) & (chat_box[:,:,0] > 100)) | shadow_mask
+    blue_mask = (dist_from_blue <= 0.1) | shadow_mask
+    final_mask = blue_mask | red_mask
+    final_mask = np.stack([final_mask, final_mask, final_mask], axis=2)
     return final_mask
 
 def extract_chat_events(which=None, image: Optional[Union[Image.Image,np.ndarray]] = None, mask=None) -> List[Event]:
@@ -152,9 +137,9 @@ def extract_chat_events(which=None, image: Optional[Union[Image.Image,np.ndarray
     else:
         chat_box = np.array(select_chat_box(image))
     if mask is None:
-        mask = extract_mask(which, image)
+        mask = extract_mask(which, chat_box)
     chat_box = np.where(mask, np.array(chat_box), 0)
-    text = pytesseract.image_to_string(chat_box, lang="eng")
+    text = pytesseract.image_to_string(chat_box, lang="eng", config="--psm 6").replace("{","[").replace("}","]")
     valid = list(parse_raw_text(text))
     # red_text = pytesseract.image_to_string(red_chat_box, lang="eng")
     # blue_text = pytesseract.image_to_string(blue_chat_box, lang="eng")
