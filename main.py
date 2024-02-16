@@ -175,7 +175,7 @@ class FishingBot:
         if state == State.INIT:
             self.click(VK_BACKSPACE)
         elif state == State.FISHING:
-            self.click(VK_FISH, min_time_between_clicks=2.5)
+            self.click(VK_FISH, min_time_between_clicks=1)
             self.click(VK_SHIFT, min_time_between_clicks=10)
             self.click(VK_FINFO, min_time_between_clicks=5)
         elif state == State.UNDEFINED:
