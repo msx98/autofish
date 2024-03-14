@@ -39,6 +39,8 @@ class FishingBot:
         self.new_mask = False
         self.unread_events: int = 0
         self.tried_to_throw = None
+        self.ignore_next_quit = False
+        self.last_batch_reaction: datetime.datetime = datetime.datetime(1970, 1, 1, 1, 1, 1)
         self.extract_chat_events_loop()
     
     @property
@@ -74,7 +76,16 @@ class FishingBot:
         self.enabled = enabled
 
     def step(self):
-        self.state = self.perform_step(self.state)
+        if self.state != State.DISABLED:
+            self.click(VK_LOTTO, min_time_between_clicks=60*12)
+        state = self.state
+        next_state = state
+        if state != State.DISABLED:
+            next_state = self.perform_step(state)
+            if self.state == State.DISABLED:
+                pass
+            else:
+                self.state = next_state
         self.perform_post_step(self.state)
     
     def extract_chat_events_loop(self):
@@ -86,14 +97,13 @@ class FishingBot:
                 if self.enabled:
                     new_ss = np.array(select_chat_box(take_screenshot()))
                     new_mask = extract_mask(None, new_ss)
-                    diff = np.mean(self.mask - new_mask)
+                    diff = np.mean(np.uint8((self.mask ^ new_mask)*1))
                     self.new_mask_lock.acquire()
                     self.ss = new_ss
                     self.mask = new_mask
-                    if diff > 0.1:
+                    if diff > 0.1: # more than
                         self.new_mask = True
                     self.new_mask_lock.release()
-                    time.sleep(0.1)
         def loop(which):
             while True:
                 if self.enabled:
@@ -102,10 +112,13 @@ class FishingBot:
                     new_mask = self.new_mask
                     if new_mask:
                         new_mask = False
-                        chat_events = extract_chat_events(which, self.ss, self.mask)
+                        ss = np.copy(self.ss)
+                        mask = np.copy(self.mask)
                         self.new_mask_lock.release()
+                        chat_events = extract_chat_events(which, ss, mask)
                     else:
                         self.new_mask_lock.release()
+                        time.sleep(0.08)
                         continue
                     delay = time.time() - t
                     self.events_lock.acquire()
@@ -132,12 +145,25 @@ class FishingBot:
             self.events_lock.release()
             for e in new_events:
                 state = self.step_on_event(state, e)
+            self.last_batch_reaction = datetime.datetime.now()
             return state
         raise RuntimeError(f"Undefined state: {state}")
 
     def step_on_event(self, prev_state: State, e: Event) -> State:
         printd(f"REACT: {e}")
         if e.name == "fishing":
+            seconds_now = datetime.datetime.now().second
+            try:
+                seconds_then = int(e.ts.split(":")[-1].replace("]",""))
+                assert 0 <= seconds_then < 60
+            except:
+                seconds_then = seconds_now - 1
+            delay = seconds_now - seconds_then
+            if delay < 0:
+                delay += 60
+            delay = min(delay, 5)
+            next_time_allowed = (time.time() - delay) + 8.5 # doesnt account for next cycle, image proc interval, etc
+            self.last_click_button[VK_FISH] = next_time_allowed
             return State.FISHING
         if e.name == "caught":
             with open("fishlog.txt", "a") as f:
@@ -146,6 +172,8 @@ class FishingBot:
                 time.sleep(0.75)
                 result = self.click(VK_TB, min_time_between_clicks=5)
                 printd(f"Throwback result for {e.fish_type}: {result}")
+            #self.click(VK_FISH, min_time_between_clicks=None)
+            self.spam_test()
             self.click(VK_FINFO, min_time_between_clicks=5)
             return State.FISHING#prev_state
         if e.name == "inv_full":
@@ -169,9 +197,16 @@ class FishingBot:
             time.sleep(1)
             return State.FISHING#prev_state
         if e.name == "already_fishing":
+            self.last_click_button[VK_FISH] = time.time() +2
+            return State.FISHING
+        if e.name == "wait_before_fishing":
+            self.last_click_button[VK_FISH] = time.time() +0.5
             return State.FISHING
         if e.name == "thrown":
             self.tried_to_throw = None
+            return State.FISHING
+        if e.name == "failed_to_catch":
+            self.last_click_button[VK_FISH] = time.time() + 0.5
             return State.FISHING
         raise RuntimeError(f"Did not return a state: {e}, {prev_state}")
 
@@ -181,10 +216,8 @@ class FishingBot:
         elif state == State.FISHING:
             self.click(VK_FISH, min_time_between_clicks=1)
             self.click(VK_SHIFT, min_time_between_clicks=10)
-            self.click(VK_FINFO, min_time_between_clicks=5)
         elif state == State.UNDEFINED:
             self.click(VK_SHIFT, min_time_between_clicks=7.5) # in case we are dead
-        self.click(VK_LOTTO, min_time_between_clicks=60*12)
 
     def click(self, key, *, block_until_keydown=False, click_length:float=0.08, min_time_between_clicks:Optional[float]=1) -> Optional[bool]:
         if isinstance(key, (list, tuple,)):
@@ -203,15 +236,32 @@ class FishingBot:
         self.last_click = click_time
         self.last_click_button[key] = click_time
         return True
+    
+    def spam_test(self, *, do_thread: bool = True, n_clicks: int = 5, time_between_clicks: float = 0.08):
+        assert n_clicks >= 1
+        assert time_between_clicks > 0
+        def f():
+            self.click(VK_POST_TEST_MSG, min_time_between_clicks=time_between_clicks)
+            for i in range(n_clicks - 1):
+                time.sleep(time_between_clicks)
+                self.click(VK_POST_TEST_MSG, min_time_between_clicks=time_between_clicks)
+        t = threading.Thread(target=f)
+        t.start()
+        if not do_thread:
+            t.join()
 
 
 def main():
     #time.sleep(5)
     global DEBUG_COUNTER
     bot = FishingBot()
+    def toggle_thread():
+            while True:
+                if win32api.GetAsyncKeyState(win32con.VK_DELETE):
+                    bot.toggle()
+                time.sleep(0.08)
+    threading.Thread(target=toggle_thread).start()
     while True:
-        if win32api.GetAsyncKeyState(win32con.VK_DELETE):
-            bot.toggle()
         bot.step()
         if bot.enabled:
             time.sleep(0.08)

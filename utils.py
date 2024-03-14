@@ -5,6 +5,7 @@ from PIL import ImageGrab, Image
 import win32api, win32con
 import win32com.client
 import time
+import datetime
 import sys
 import pytesseract
 import numpy as np

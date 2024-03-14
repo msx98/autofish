@@ -20,6 +20,7 @@ VK_BACKSPACE = 0x08
 VK_ENTER = 0x0D
 VK_S = 0x53
 VK_SHIFT = 0x10
+VK_POST_TEST_MSG = VK_F9
 
 
 from enum import Enum, auto
@@ -62,10 +63,11 @@ COLOR_RED = (255,0,0) # colorsys.rgb_to_hex(190,12,14)
 COLOR_RED_2 = (189,9,10)
 
 from dataclasses import dataclass
+import datetime
 
 @dataclass
 class Event:
-    ts: str
+    ts: datetime.datetime
     name: str
     fish_type: str
     fish_weight: float

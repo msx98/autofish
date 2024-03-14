@@ -1,11 +1,50 @@
 from utils import *
 
+def extract_time(
+        line: str, *,
+        time_estimate_real: datetime.datetime = None,
+        is_forgiving: bool = False,
+) -> Optional[datetime.datetime]:
+    if time_estimate_real is None:
+        time_estimate_real = datetime.datetime.now()
+    prev_day = time_estimate_real - datetime.timedelta(days=1)
+    first_of_month = prev_day.month < time_estimate_real.month
+    first_of_year = prev_day.year < time_estimate_real.year
+    try:
+        time_str = line.split(" ")[0]
+        assert len(time_str) == len("[00:00:00]")
+        time_h, time_m, time_s = int(time_str[1:3]), int(time_str[4:6]), int(time_str[7:9])
+        if is_forgiving:
+            if int(time_h / 10) == 4:
+                time_h = 10 + (time_h % 10)
+        assert (0 <= time_h <= 23) and (0 <= time_m <= 59) and (0 <= time_s <= 59)
+        is_prev_day = time_estimate_real.hour < time_h
+        is_prev_month = is_prev_day and first_of_month
+        is_prev_year = is_prev_day and first_of_year
+        ts = datetime.datetime(
+            year=time_estimate_real.year - (1*is_prev_year),
+            month=time_estimate_real.month - (1*is_prev_month),
+            day=time_estimate_real.day - (1*is_prev_day),
+            hour=time_h,
+            minute=time_m,
+            second=time_s,
+        )
+        if is_forgiving:
+            pass
+        else:
+            if abs(ts - time_estimate_real).total_seconds() >= 10:
+                return None
+        return ts
+    except:
+        return None
+
 def parse_message(line: str) -> Optional[Event]:
+    #print(f"Parsing: {line}")
     # parse into: (time, type, fish type?, weight?)
     def parse_fish_type() -> Optional[Event]:
         # [HH:MM:SS] You've caught a <number> lb <fish name>. Use /throwback to release the fish
         try:
-            time = None# line.split(" ")[0]
+            time = None #extract_time(line)
             assert "has" not in line
             assert "breaking" not in line
             s = line.split("caught a ")[1]
@@ -17,7 +56,7 @@ def parse_message(line: str) -> Optional[Event]:
     def parse_throwback() -> Optional[Event]:
         # [HH:MM:SS] You've caught a <number> lb <fish name>. Use /throwback to release the fish
         try:
-            time = None# line.split(" ")[0]
+            time = line #extract_time(line)
             assert " thrown " in line
             assert " back " in line
             s = line.split("thrown ")[1]
@@ -26,10 +65,24 @@ def parse_message(line: str) -> Optional[Event]:
             return Event(time, "thrown", fish, weight)
         except:
             return None
+    def parse_failed_to_catch() -> Optional[Event]:
+        try:
+            time = extract_time(line)
+            assert "failed to catch" in line
+            return Event(time, "failed_to_catch", None, None)
+        except:
+            return None
+    def parse_wait_before_fishing() -> Optional[Event]:
+        try:
+            time = extract_time(line)
+            assert "wait before fishing" in line
+            return Event(time, "wait_before_fishing", None, None)
+        except:
+            return None
     def parse_fishing() -> Optional[Event]:
         # [HH:MM:SS] Fishing... Please Wait.
         try:
-            time = line.split(" ")[0]
+            time = extract_time(line)
             assert ("fishing..." in line) or ("please wait" in line)
             return Event(time, "fishing")
         except:
@@ -37,14 +90,14 @@ def parse_message(line: str) -> Optional[Event]:
     def parse_inv_full() -> Optional[Event]:
         # [HH:MM:SS] Your inventory is full.
         try:
-            time = line.split(" ")[0]
+            time = extract_time(line, is_forgiving=True)
             assert "inventory is full" in line
             return Event(time, "inv_full")
         except:
             return None
     def parse_sea_monster() -> Optional[Event]:
         try:
-            time = None# line.split(" ")[0]
+            time = extract_time(line)
             assert "launched by a sea" in line
             return Event(time, "sea_monster")
         except:
@@ -52,7 +105,7 @@ def parse_message(line: str) -> Optional[Event]:
     def parse_already_fishing() -> Optional[Event]:
         # [HH:MM:SS] You're already fishing.
         try:
-            #time = line.split(" ")[0]
+            time = extract_time(line)
             assert "already fishing" in line
             return Event(None, "already_fishing")
         except:
@@ -75,14 +128,15 @@ def parse_message(line: str) -> Optional[Event]:
     def parse_quit_fishing() -> Optional[Event]:
         try:
             ts = line.split(" ")[0]
-            assert "quit fishing" in line
-            return Event(None, "quit")
+            assert ("on the coast" in line) or ("boat or right" in line)
+            return Event(ts, "quit")
         except:
             return None
     return (
         parse_fish_type() or
         parse_inv_full() or
         parse_already_fishing() or
+        parse_failed_to_catch() or
         parse_throwback() or
         parse_sea_monster() or
         parse_infected() or
