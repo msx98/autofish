@@ -69,13 +69,8 @@ import datetime
 class Event:
     ts: datetime.datetime
     name: str
-    fish_type: str
-    fish_weight: float
-    def __init__(self, ts, name, fish_type=None, fish_weight=None):
-        self.ts = ts
-        self.name = name
-        self.fish_type = fish_type
-        self.fish_weight = fish_weight
+    fish_type: str = None
+    fish_weight: float = None
     def __str__(self) -> str:
         return str((self.ts, self.name, self.fish_type, self.fish_weight))
     def __repr__(self) -> str:

@@ -12,8 +12,30 @@ import numpy as np
 import colorsys
 from matplotlib.colors import rgb_to_hsv
 from threading import Thread
+import threading
 pytesseract.pytesseract.tesseract_cmd = "C:\\Program Files\\Tesseract-OCR\\tesseract.exe"
 shell = win32com.client.Dispatch("WScript.Shell")
+
+
+def sleep(seconds: float, interrupt_event: Optional[threading.Event] = None) -> bool:
+    """
+    sleeps until seconds pass OR interrupt_event is triggered
+    returns True <-> interrupted
+    """
+    if interrupt_event is None:
+        #print(f"No event is set")
+        time.sleep(seconds)
+        return False
+    else:
+        # wait_start = time.time()
+        is_interrupted = interrupt_event.wait(timeout=seconds)
+        # wait_end = time.time()
+        # wait_elapsed = round(wait_end - wait_start, 2)
+        # if not is_interrupted:
+        #     print(f"Managed to wait for {wait_elapsed} seconds")
+        # else:
+        #     print(f"Interrupt event is set; waited for {wait_elapsed}")
+        return is_interrupted
 
 
 def convert_res(x0, y0, x1, y1):

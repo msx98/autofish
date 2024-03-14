@@ -32,10 +32,10 @@ def extract_time(
         if is_forgiving:
             pass
         else:
-            if abs(ts - time_estimate_real).total_seconds() >= 10:
+            if abs(ts - time_estimate_real).total_seconds() >= 10000:
                 return None
         return ts
-    except:
+    except Exception as e:
         return None
 
 def parse_message(line: str) -> Optional[Event]:
@@ -108,7 +108,7 @@ def parse_message(line: str) -> Optional[Event]:
             ts = extract_time(line)
             assert "already fishing" in line
             return Event(ts, "already_fishing")
-        except:
+        except Exception as e:
             return None
     def parse_infected() -> Optional[Event]:
         # [HH:MM:SS] A fish has infected you...

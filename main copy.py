@@ -1,6 +1,5 @@
 from utils import *
 from parsing import *
-from typo_dict import TypoDict
 shell.AppActivate("FiveM")
 
 
@@ -8,7 +7,7 @@ def should_throwback(fish_type, fish_weight):
     DONT_WANT = 999999999
     DEFAULT_MIN = 150
     fish_type = fish_type.lower()
-    throwback = TypoDict({
+    throwback = {
         # throw back any fish weighing less than this
         # if unspecified, keep
         "sunfish": DONT_WANT,
@@ -26,28 +25,21 @@ def should_throwback(fish_type, fish_weight):
         "blue marlin": 2000,
         "moray eel": 100,
         "ray": 100,
-    })
+    }
     return fish_weight < throwback.get(fish_type, DEFAULT_MIN)
 
 
 import threading
 class FishingBot:
     def __init__(self):
-        self._killed_event: threading.Event = threading.Event()
-        self._killed_event.clear()
         self.state = State.DISABLED
-        self.events: List[Event] = []
+        self.events: List[threading.Event] = []
         self.events_lock: threading.Lock = threading.Lock()
         self.new_mask_lock: threading.Lock = threading.Lock()
         self.new_mask = False
         self.unread_events: int = 0
         self.tried_to_throw = None
-        self.ignore_next_quit = False
-        self.last_batch_reaction: datetime.datetime = datetime.datetime(1970, 1, 1, 1, 1, 1)
         self.extract_chat_events_loop()
-    
-    def sleep(self, seconds: float) -> bool:
-        return sleep(seconds, interrupt_event=self._killed_event)
     
     @property
     def state(self):
@@ -69,10 +61,8 @@ class FishingBot:
             self.last_click_button = dict()
             if new_state == State.INIT: #enabled
                 beep(freq=3500, duration=500)
-            elif new_state == State.DISABLED:
+            else: #disabled
                 beep(freq=1500, duration=500)
-            else:
-                raise Exception(f"Internal error - invalid state {new_state}")
     
     @enabled.setter
     def enabled(self, value: bool):
@@ -82,12 +72,6 @@ class FishingBot:
     def toggle(self):
         enabled = not self.enabled
         self.enabled = enabled
-        if enabled:
-            print(f"Clearing killed event")
-            self._killed_event.clear()
-        else:
-            print(f"Setting killed event")
-            self._killed_event.set()
 
     def step(self):
         if self.state != State.DISABLED:
@@ -115,7 +99,7 @@ class FishingBot:
                     self.new_mask_lock.acquire()
                     self.ss = new_ss
                     self.mask = new_mask
-                    if diff > 0.1: # more than
+                    if diff > 0.1: # more than 10%
                         self.new_mask = True
                     self.new_mask_lock.release()
         def loop(which):
@@ -157,39 +141,25 @@ class FishingBot:
             new_events = self.events[len(self.events)-self.unread_events:]
             self.unread_events = 0
             self.events_lock.release()
-            # if new_events:
-            #     print(f"New events length: {len(new_events)}")
             for e in new_events:
                 state = self.step_on_event(state, e)
-            self.last_batch_reaction = datetime.datetime.now()
             return state
         raise RuntimeError(f"Undefined state: {state}")
 
     def step_on_event(self, prev_state: State, e: Event) -> State:
         printd(f"REACT: {e}")
         if e.name == "fishing":
-            seconds_now = datetime.datetime.now().second
-            try:
-                seconds_then = int(e.ts.split(":")[-1].replace("]",""))
-                assert 0 <= seconds_then < 60
-            except:
-                seconds_then = seconds_now - 1
-            delay = seconds_now - seconds_then
-            if delay < 0:
-                delay += 60
-            delay = min(delay, 5)
-            next_time_allowed = (time.time() - delay) + 8.5 # doesnt account for next cycle, image proc interval, etc
-            self.last_click_button[VK_FISH] = next_time_allowed
+            time.sleep(3)
             return State.FISHING
         if e.name == "caught":
             with open("fishlog.txt", "a") as f:
                 f.write(str((time.time(), None, e.name, e.fish_type, e.fish_weight)) + "\n")
             if should_throwback(e.fish_type, e.fish_weight):
-                self.sleep(0.75)
+                time.sleep(0.75)
                 result = self.click(VK_TB, min_time_between_clicks=5)
                 printd(f"Throwback result for {e.fish_type}: {result}")
+                time.sleep(1)
             #self.click(VK_FISH, min_time_between_clicks=None)
-            self.spam_test(spam_key=VK_FISH)
             self.click(VK_FINFO, min_time_between_clicks=5)
             return State.FISHING#prev_state
         if e.name == "inv_full":
@@ -197,32 +167,25 @@ class FishingBot:
             return State.DISABLED
         if e.name == "sea_monster":
             self.click(VK_SHIFT)
-            self.sleep(0.3)
+            time.sleep(0.3)
             self.click([VK_SHIFT, VK_S], click_length=7, min_time_between_clicks=0.1)
             return State.DISABLED
         if e.name == "exploded":
-            self.sleep(1)
+            time.sleep(1)
             self.click(VK_SHIFT, min_time_between_clicks=0.1)
             return State.DISABLED
         if e.name == "quit":
             return State.DISABLED
         if e.name == "infected":
             self.click(VK_ADRENALINE, min_time_between_clicks=10)
-            self.sleep(5)
+            time.sleep(5)
             self.click(VK_FISH, min_time_between_clicks=None)
-            self.sleep(1)
+            time.sleep(1)
             return State.FISHING#prev_state
         if e.name == "already_fishing":
-            self.last_click_button[VK_FISH] = time.time() +2
-            return State.FISHING
-        if e.name == "wait_before_fishing":
-            self.last_click_button[VK_FISH] = time.time() +0.5
             return State.FISHING
         if e.name == "thrown":
             self.tried_to_throw = None
-            return State.FISHING
-        if e.name == "failed_to_catch":
-            self.last_click_button[VK_FISH] = time.time() + 0.5
             return State.FISHING
         raise RuntimeError(f"Did not return a state: {e}, {prev_state}")
 
@@ -244,7 +207,7 @@ class FishingBot:
             time_until_click = next_allowed_click - time.time()
             if time_until_click > 0:
                 if block_until_keydown:
-                    self.sleep(time_until_click)
+                    time.sleep(time_until_click)
                 else:
                     return False
         click_keyboard(key, click_length)
@@ -252,25 +215,6 @@ class FishingBot:
         self.last_click = click_time
         self.last_click_button[key] = click_time
         return True
-    
-    def spam_test(
-            self, *,
-            do_thread: bool = True,
-            n_clicks: int = 5,
-            time_between_clicks: float = 0.08,
-            spam_key: int = VK_POST_TEST_MSG,
-        ):
-        assert n_clicks >= 1
-        assert time_between_clicks > 0
-        def f():
-            self.click(spam_key, min_time_between_clicks=time_between_clicks)
-            for i in range(n_clicks - 1):
-                self.sleep(time_between_clicks)
-                self.click(spam_key, min_time_between_clicks=time_between_clicks)
-        t = threading.Thread(target=f)
-        t.start()
-        if not do_thread:
-            t.join()
 
 
 def main():
