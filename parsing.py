@@ -44,76 +44,76 @@ def parse_message(line: str) -> Optional[Event]:
     def parse_fish_type() -> Optional[Event]:
         # [HH:MM:SS] You've caught a <number> lb <fish name>. Use /throwback to release the fish
         try:
-            time = None #extract_time(line)
+            ts = None #extract_time(line)
             assert "has" not in line
             assert "breaking" not in line
             s = line.split("caught a ")[1]
             weight = float(s.split(" ")[0].replace(",",""))
             fish = " ".join(s.split(" ")[2:]).split(".")[0].split(",")[0] # remove weight, lb/Ib from beginning, then get fish name
-            return Event(time, "caught", fish, weight)
+            return Event(ts, "caught", fish, weight)
         except:
             return None
     def parse_throwback() -> Optional[Event]:
         # [HH:MM:SS] You've caught a <number> lb <fish name>. Use /throwback to release the fish
         try:
-            time = line #extract_time(line)
+            ts = extract_time(line)
             assert " thrown " in line
             assert " back " in line
             s = line.split("thrown ")[1]
             weight = float(s.split(" ")[0])
             fish = (" ".join(s.split(" of ")[1:]).split(" back ")[0])
-            return Event(time, "thrown", fish, weight)
+            return Event(ts, "thrown", fish, weight)
         except:
             return None
     def parse_failed_to_catch() -> Optional[Event]:
         try:
-            time = extract_time(line)
+            ts = extract_time(line)
             assert "failed to catch" in line
-            return Event(time, "failed_to_catch", None, None)
+            return Event(ts, "failed_to_catch", None, None)
         except:
             return None
     def parse_wait_before_fishing() -> Optional[Event]:
         try:
-            time = extract_time(line)
+            ts = extract_time(line)
             assert "wait before fishing" in line
-            return Event(time, "wait_before_fishing", None, None)
+            return Event(ts, "wait_before_fishing", None, None)
         except:
             return None
     def parse_fishing() -> Optional[Event]:
         # [HH:MM:SS] Fishing... Please Wait.
         try:
-            time = extract_time(line)
+            ts = extract_time(line)
             assert ("fishing..." in line) or ("please wait" in line)
-            return Event(time, "fishing")
+            return Event(ts, "fishing")
         except:
             return None
     def parse_inv_full() -> Optional[Event]:
         # [HH:MM:SS] Your inventory is full.
         try:
-            time = extract_time(line, is_forgiving=True)
+            ts = extract_time(line, is_forgiving=True)
             assert "inventory is full" in line
-            return Event(time, "inv_full")
+            return Event(ts, "inv_full")
         except:
             return None
     def parse_sea_monster() -> Optional[Event]:
         try:
-            time = extract_time(line)
+            ts = extract_time(line)
             assert "launched by a sea" in line
-            return Event(time, "sea_monster")
+            return Event(ts, "sea_monster")
         except:
             return None
     def parse_already_fishing() -> Optional[Event]:
         # [HH:MM:SS] You're already fishing.
         try:
-            time = extract_time(line)
+            ts = extract_time(line)
             assert "already fishing" in line
-            return Event(None, "already_fishing")
+            return Event(ts, "already_fishing")
         except:
             return None
     def parse_infected() -> Optional[Event]:
         # [HH:MM:SS] A fish has infected you...
         try:
-            ts = line.split(" ")[0]
+            ts = extract_time(line)
             assert "infected" in line
             return Event(ts, "infected")
         except:
@@ -199,4 +199,6 @@ def extract_chat_events(which=None, image: Optional[Union[Image.Image,np.ndarray
     # blue_text = pytesseract.image_to_string(blue_chat_box, lang="eng")
     # #Image.fromarray(np.uint8(red_chat_box)).convert('RGB').show()
     # valid = list(parse_raw_text(blue_text) | parse_raw_text(red_text))
+    #if any([e.name == "quit" for e in valid]):
+    #    print("break here")
     return valid
