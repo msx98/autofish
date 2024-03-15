@@ -15,6 +15,11 @@ from threading import Thread
 import threading
 pytesseract.pytesseract.tesseract_cmd = "C:\\Program Files\\Tesseract-OCR\\tesseract.exe"
 shell = win32com.client.Dispatch("WScript.Shell")
+import tesserocr
+import os
+os.environ["TESSDATA_PREFIX"] = "C:\\Program Files\\Tesseract-OCR\\tessdata"
+api = tesserocr.PyTessBaseAPI(path="C:\\Program Files\\Tesseract-OCR\\tessdata")
+api.Init("", "eng", tesserocr.OEM.LSTM_ONLY)
 
 
 def sleep(seconds: float, interrupt_event: Optional[threading.Event] = None) -> bool:
@@ -59,7 +64,8 @@ def calc_dist_from_color(image, color, metric="hsv"):
         dist = np.sqrt(np.sum((image - color) ** 2, axis=2))
     elif metric == "hsv":
         image_hsv = image[:,:,0:2]
-        color_hsv = colorsys.rgb_to_hsv(*color)[0:2]
+        #color_hsv = colorsys.rgb_to_hsv(*color)[0:2]
+        color_hsv = color[0:2]
         dist = np.sqrt(np.sum((image_hsv - color_hsv) ** 2, axis=2))
     elif metric == "intensity":
         image_hsv = image[:,:,2]

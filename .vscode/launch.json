@@ -5,10 +5,18 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Current File",
+            "name": "Main",
             "type": "python",
             "request": "launch",
             "program": "main.py",//"${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "Debug",
+            "type": "python",
+            "request": "launch",
+            "program": "debug.py",
             "console": "integratedTerminal",
             "justMyCode": true
         }

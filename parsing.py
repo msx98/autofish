@@ -193,7 +193,9 @@ def extract_chat_events(which=None, image: Optional[Union[Image.Image,np.ndarray
     if mask is None:
         mask = extract_mask(which, chat_box)
     chat_box = np.where(mask, np.array(chat_box), 0)
-    text = pytesseract.image_to_string(chat_box, lang="eng", config="--psm 6").replace("{","[").replace("}","]")
+    chat_box_gray: np.ndarray = cv.cvtColor(chat_box, cv.COLOR_RGB2GRAY)
+    api.SetImageBytes(chat_box_gray.tobytes(), chat_box_gray.shape[1], chat_box_gray.shape[0], 1, chat_box_gray.shape[1])
+    text = api.GetUTF8Text()
     valid = list(parse_raw_text(text))
     # red_text = pytesseract.image_to_string(red_chat_box, lang="eng")
     # blue_text = pytesseract.image_to_string(blue_chat_box, lang="eng")

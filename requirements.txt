@@ -5,3 +5,5 @@ scikit-learn
 scikit-image
 matplotlib
 pywin32
+opencv-contrib
+tesserocr
