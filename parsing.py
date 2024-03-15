@@ -168,13 +168,35 @@ def extract_finv_fish(image) -> Tuple[Event]:
 def extract_mask(which=None, image: Optional[np.ndarray] = None) -> np.ndarray:
     chat_box = np.array(image)
     chat_box_hsv = rgb_to_hsv(chat_box)
-    dist_from_black = calc_dist_from_color(chat_box_hsv, 0, "intensity")
+    intensity = chat_box_hsv[:,:,2]
+    intensity_mask = intensity > 107 #np.percentile(intensity, 90)
+    # rough_mask = cv.filter2D(np.uint8(intensity_mask), -1, np.ones((3,3),np.float32)) > 0
+    very_rough_mask = cv.filter2D(np.uint8(intensity_mask), -1, np.ones((5,5),np.float32)) > 0
+    #very_rough_mask_stacked = np.stack([very_rough_mask, very_rough_mask, very_rough_mask], axis=2)
+    #chat_box_hsv = chat_box_hsv * very_rough_mask_stacked
+    # vals = dict()
+    # h, w, d = chat_box_hsv.shape
+    # for x in range(h):
+    #     for y in range(w):
+    #         val=tuple(chat_box_hsv[x,y])
+    #         vals[val] = vals.get(val, 0) + 1
+    # vals_list = list(vals.items())
+    # sorted_vals = sorted(vals_list, key=lambda x: x[1], reverse=True)
+    # def show_color(i: int):
+    #     color = sorted_vals[i][0]
+    #     Image.fromarray(np.ones((100,100,3), dtype=np.uint8)*np.uint8(colorsys.hsv_to_rgb(*color))).show()
+    # show_color(0)
+    # chat_box_filtered = np.where(rough_mask_stacked, chat_box, 255)
+    # Image.fromarray(np.uint8(chat_box_filtered)).convert('RGB').show()
     dist_from_blue = calc_dist_from_color(chat_box_hsv, COLOR_TURQUOISE)
-    shadow_mask = dist_from_black<np.min(dist_from_black)+20
-    red_mask = ((chat_box[:,:,1] < 50) & (chat_box[:,:,2] < 50) & (chat_box[:,:,0] > 100)) | shadow_mask
-    blue_mask = (dist_from_blue <= 0.1) | shadow_mask
+    blue_mask = (dist_from_blue <= 0.1)
+    red_mask = (((1 - chat_box_hsv[:,:,1] < 0.1) | (calc_dist_from_color(chat_box_hsv, (255, 0, 0)) < 0.3)))
     final_mask = blue_mask | red_mask
-    final_mask = np.stack([final_mask, final_mask, final_mask], axis=2)
+    final_mask = final_mask & very_rough_mask
+    final_mask = cv.filter2D(np.uint8(final_mask), -1, np.ones((3,3),np.float32)) > 0
+    #final_mask = np.stack([final_mask, final_mask, final_mask], axis=2)
+    # chat_box_filtered = np.where(final_mask, chat_box, 255)
+    # Image.fromarray(np.uint8(chat_box_filtered)).convert('RGB').show()
     return final_mask
 
 def extract_chat_events(which=None, image: Optional[Union[Image.Image,np.ndarray]] = None, mask=None) -> List[Event]:
@@ -192,8 +214,8 @@ def extract_chat_events(which=None, image: Optional[Union[Image.Image,np.ndarray
         chat_box = np.array(select_chat_box(image))
     if mask is None:
         mask = extract_mask(which, chat_box)
-    chat_box = np.where(mask, np.array(chat_box), 0)
-    chat_box_gray: np.ndarray = cv.cvtColor(chat_box, cv.COLOR_RGB2GRAY)
+    chat_box[mask==0] = 0
+    chat_box_gray = cv.cvtColor(chat_box, cv.COLOR_RGB2GRAY)
     api.SetImageBytes(chat_box_gray.tobytes(), chat_box_gray.shape[1], chat_box_gray.shape[0], 1, chat_box_gray.shape[1])
     text = api.GetUTF8Text()
     valid = list(parse_raw_text(text))
